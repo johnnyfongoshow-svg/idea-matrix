@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Mirror Idea Matrix</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep:#0C0C0F; --bg-surface:#141418; --bg-card:#1A1A20; --bg-elevated:#222229;
+  --border:#2A2A33; --border-hover:#3A3A44;
+  --text-primary:#E8E0D4; --text-secondary:#9A9488; --text-muted:#5E5A54;
+  --accent-gold:#C9A84C; --accent-gold-dim:#C9A84C33; --accent-gold-glow:#C9A84C15;
+  --accent-red:#D4505A; --accent-blue:#5A8FC4; --accent-teal:#4CA89E; --accent-purple:#B07CC6;
+  --accent-red-dim:#D4505A22; --accent-blue-dim:#5A8FC422; --accent-teal-dim:#4CA89E22; --accent-purple-dim:#B07CC622;
+  --font-display:'Syne',sans-serif; --font-body:'Libre Baskerville',Georgia,serif; --font-mono:'JetBrains Mono',monospace;
+  --radius:6px; --transition:0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg-deep);color:var(--text-primary);font-family:var(--font-body);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:9999}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg-deep)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.sync-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-bottom:20px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text-muted);transition:background 0.3s}
+.sync-dot.connected{background:#4CAF50}.sync-dot.syncing{background:var(--accent-gold);animation:pulse 1s infinite}.sync-dot.error{background:var(--accent-red)}.sync-dot.offline{background:var(--text-muted)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.app{display:flex;min-height:100vh}
+.sidebar{width:260px;min-width:260px;background:var(--bg-surface);border-right:1px solid var(--border);padding:28px 20px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.main{flex:1;padding:32px 40px;max-width:960px}
+
+/* Setup */
+.setup-screen{max-width:580px;margin:60px auto;padding:0 20px}
+.setup-title{font-family:var(--font-display);font-size:32px;font-weight:800;margin-bottom:8px}
+.setup-subtitle{font-size:14px;color:var(--text-secondary);margin-bottom:32px;line-height:1.7}
+.setup-step{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.setup-step-num{font-family:var(--font-display);font-size:12px;font-weight:700;color:var(--accent-gold);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px}
+.setup-step p{font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px}
+.setup-step code{display:block;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;padding:10px 14px;margin:8px 0;font-family:var(--font-mono);font-size:11px;color:var(--accent-gold);overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.setup-input-group{margin-bottom:14px}
+.setup-label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:block}
+.setup-input{width:100%;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none}
+.setup-input:focus{border-color:var(--accent-gold);box-shadow:0 0 0 3px var(--accent-gold-dim)}
+.setup-btn{width:100%;padding:13px;background:var(--accent-gold);border:none;border-radius:var(--radius);color:var(--bg-deep);font-family:var(--font-display);font-size:15px;font-weight:700;cursor:pointer;transition:var(--transition);margin-top:8px}
+.setup-btn:hover{background:#D4B35A;box-shadow:0 4px 20px var(--accent-gold-dim)}
+.setup-btn:disabled{opacity:0.5;cursor:wait}
+.setup-error{background:var(--accent-red-dim);border:1px solid #44222A;border-radius:var(--radius);padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--accent-red);margin-top:10px;display:none}
+.setup-skip{display:block;text-align:center;margin-top:16px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);cursor:pointer;background:none;border:none;text-decoration:underline}
+.setup-skip:hover{color:var(--text-secondary)}
+
+/* Logo */
+.logo{font-family:var(--font-display);font-size:14px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-primary);margin-bottom:2px;display:flex;align-items:center;gap:10px}
+.logo-diamond{color:var(--accent-gold);font-size:20px;line-height:1}
+.logo-sub{font-family:var(--font-mono);font-size:9px;font-weight:500;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:4px}
+.idea-count{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:16px}
+
+/* Nav */
+.nav-section{margin-bottom:24px}
+.nav-label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}
+.nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:1px solid transparent;border-radius:var(--radius);color:var(--text-secondary);font-family:var(--font-display);font-size:13px;font-weight:500;cursor:pointer;transition:var(--transition);text-align:left;margin-bottom:3px}
+.nav-btn:hover{background:var(--bg-card);color:var(--text-primary)}
+.nav-btn.active{background:var(--accent-gold-glow);border-color:var(--accent-gold-dim);color:var(--accent-gold)}
+.nav-icon{width:18px;text-align:center;font-size:14px}
+
+.capture-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;background:var(--accent-gold);border:none;border-radius:var(--radius);color:var(--bg-deep);font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:0.04em;cursor:pointer;transition:var(--transition);margin-bottom:24px}
+.capture-btn:hover{background:#D4B35A;transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-gold-dim)}
+
+.filter-group{margin-bottom:14px}
+.filter-label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px}
+.filter-select,.filter-input{width:100%;padding:7px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none}
+.filter-select:focus,.filter-input:focus{border-color:var(--accent-gold-dim)}
+.filter-select option{background:var(--bg-card)}
+.sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid var(--border)}
+.sidebar-footer-btn{display:block;width:100%;padding:7px 10px;background:transparent;border:1px solid var(--border);border-radius:var(--radius);color:var(--text-muted);font-family:var(--font-mono);font-size:11px;cursor:pointer;transition:var(--transition);margin-bottom:6px;text-align:center}
+.sidebar-footer-btn:hover{border-color:var(--text-muted);color:var(--text-secondary)}
+
+.page-header{margin-bottom:28px}
+.page-title{font-family:var(--font-display);font-size:28px;font-weight:800;letter-spacing:-0.01em;margin-bottom:4px}
+.page-subtitle{font-family:var(--font-mono);font-size:12px;color:var(--text-muted)}
+
+/* Cards */
+.idea-card{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--text-muted);border-radius:var(--radius);padding:18px 20px;margin-bottom:10px;cursor:pointer;transition:var(--transition);animation:cardIn 0.3s ease both}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.idea-card:hover{background:var(--bg-elevated);border-color:var(--border-hover)}
+.idea-card.expanded{border-color:var(--border-hover);background:var(--bg-elevated)}
+.card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.domain-badge{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:3px 9px;border-radius:3px}
+.domain-music{background:var(--accent-red-dim);color:var(--accent-red)}
+.domain-writing{background:var(--accent-blue-dim);color:var(--accent-blue)}
+.domain-art{background:var(--accent-gold-dim);color:var(--accent-gold)}
+.domain-trading{background:var(--accent-purple-dim);color:var(--accent-purple)}
+.domain-tech{background:var(--accent-teal-dim);color:var(--accent-teal)}
+.priority-indicator{width:8px;height:8px;border-radius:50%;display:inline-block}
+.card-title{font-family:var(--font-display);font-size:16px;font-weight:600;line-height:1.35;margin-bottom:6px}
+.card-notes{font-size:13px;color:var(--text-secondary);line-height:1.5;margin-bottom:8px}
+.card-meta{display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.card-meta .stage{color:var(--text-secondary)}.card-meta .links{color:var(--accent-teal)}.card-meta .date{margin-left:auto}
+.card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.tag-chip{font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg-surface);border:1px solid var(--border);color:var(--text-secondary)}
+.card-expanded{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.linked-section{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.linked-label{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em}
+.linked-chip{font-family:var(--font-mono);font-size:11px;padding:3px 9px;border:1px solid var(--accent-teal-dim);border-radius:4px;background:var(--bg-surface);color:var(--text-secondary)}
+.card-actions{display:flex;gap:8px}
+.action-btn{font-family:var(--font-mono);font-size:11px;padding:5px 14px;border-radius:4px;cursor:pointer;transition:var(--transition);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-secondary)}
+.action-btn:hover{border-color:var(--text-muted);color:var(--text-primary)}
+.action-btn.danger{border-color:#44222A;color:var(--accent-red)}.action-btn.danger:hover{background:var(--accent-red-dim)}
+.action-btn.advance{border-color:var(--accent-teal-dim);color:var(--accent-teal)}.action-btn.advance:hover{background:var(--accent-teal-dim)}
+
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;animation:fadeIn 0.15s ease}
+.modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:modalIn 0.25s cubic-bezier(0.16,1,0.3,1)}
+@keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.modal-title{font-family:var(--font-display);font-size:20px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px}.modal-close:hover{color:var(--text-primary)}
+.form-group{margin-bottom:16px}
+.form-label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;display:block}
+.form-input,.form-textarea{width:100%;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-family:var(--font-body);font-size:14px;outline:none;transition:var(--transition)}
+.form-input:focus,.form-textarea:focus{border-color:var(--accent-gold);box-shadow:0 0 0 3px var(--accent-gold-dim)}
+.form-input::placeholder,.form-textarea::placeholder{color:var(--text-muted)}
+.form-textarea{resize:vertical;min-height:80px}
+.form-input.title-input{font-family:var(--font-display);font-size:16px;font-weight:600}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.chip-btn{font-family:var(--font-mono);font-size:11px;padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-card);color:var(--text-secondary);cursor:pointer;transition:var(--transition)}
+.chip-btn:hover{border-color:var(--text-muted)}.chip-btn.selected{color:#fff}
+.link-list{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto}
+.link-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);cursor:pointer;transition:var(--transition);text-align:left;width:100%}
+.link-item:hover{border-color:var(--text-muted)}.link-item.selected{border-color:var(--accent-teal);background:var(--accent-teal-dim)}
+.link-badge{margin-left:auto;font-size:9px;font-weight:600;color:var(--accent-teal)}
+.submit-btn{width:100%;padding:12px;background:var(--accent-gold);border:none;border-radius:var(--radius);color:var(--bg-deep);font-family:var(--font-display);font-size:14px;font-weight:700;cursor:pointer;transition:var(--transition);margin-top:8px}
+.submit-btn:hover{background:#D4B35A;box-shadow:0 4px 20px var(--accent-gold-dim)}.submit-btn:disabled{opacity:0.35;cursor:not-allowed}
+
+/* Dashboard */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center}
+.stat-number{font-family:var(--font-display);font-size:38px;font-weight:800;line-height:1;margin-bottom:4px}
+.stat-label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted)}
+.breakdown-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+.breakdown-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.breakdown-title{font-family:var(--font-display);font-size:14px;font-weight:700;margin-bottom:16px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.bar-label{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);min-width:120px}
+.bar-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width 0.5s cubic-bezier(0.25,0.46,0.45,0.94)}
+.bar-count{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);min-width:20px;text-align:right}
+.cluster-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.cluster-title{font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:12px}
+.cluster-idea{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}.cluster-idea:last-child{border-bottom:none}
+.cluster-links{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-muted)}.empty-state p{margin-bottom:16px;font-size:14px}
+
+@media(max-width:768px){.app{flex-direction:column}.sidebar{width:100%;min-width:unset;height:auto;position:relative;padding:16px}.main{padding:20px 16px}.stats-grid{grid-template-columns:repeat(2,1fr)}.breakdown-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// INTERACTIVE MIRROR IDEA MATRIX — Apps Script Cloud Sync
+// ═══════════════════════════════════════════════════════════════════
+
+const CONFIG_KEY='imim-config-v2', LOCAL_KEY='imim-ideas-cache';
+
+const DOMAINS={
+  music:{label:'Music / Audio',icon:'\u266A',color:'var(--accent-red)',cls:'domain-music'},
+  writing:{label:'Writing / Books',icon:'\u270E',color:'var(--accent-blue)',cls:'domain-writing'},
+  art:{label:'Art / Design',icon:'\u25C6',color:'var(--accent-gold)',cls:'domain-art'},
+  trading:{label:'Trading / Finance',icon:'\u2616',color:'var(--accent-purple)',cls:'domain-trading'},
+  tech:{label:'Tech / Speculative',icon:'\u26A1',color:'var(--accent-teal)',cls:'domain-tech'},
+};
+const STAGES={spark:{label:'Spark',icon:'\u2726'},developing:{label:'Developing',icon:'\u25D0'},'in-progress':{label:'In Progress',icon:'\u25B6'},complete:{label:'Complete',icon:'\u25CF'}};
+const STAGE_KEYS=['spark','developing','in-progress','complete'];
+const PRIORITIES={high:{label:'High Energy',color:'var(--accent-red)'},medium:{label:'Medium',color:'var(--accent-gold)'},low:{label:'Parked',color:'var(--text-muted)'}};
+
+let state={configured:false,scriptUrl:'',ideas:[],page:'catalog',expandedId:null,modalOpen:false,editingId:null,filters:{search:'',domain:'all',stage:'all',priority:'all'},syncStatus:'offline',lastSync:null};
+let modalState={domain:'music',stage:'spark',priority:'medium',linkedIds:[]};
+
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function today(){return new Date().toISOString().split('T')[0];}
+function getIdea(id){return state.ideas.find(i=>i.id===id);}
+function nextId(){return state.ideas.reduce((m,i)=>Math.max(m,typeof i.id==='number'?i.id:0),0)+1;}
+
+// ─── Config ─────────────────────────────────────────────────────────
+function loadConfig(){try{const c=JSON.parse(localStorage.getItem(CONFIG_KEY));if(c&&c.scriptUrl){state.scriptUrl=c.scriptUrl;state.configured=true;return true;}}catch(e){}return false;}
+function saveConfig(){localStorage.setItem(CONFIG_KEY,JSON.stringify({scriptUrl:state.scriptUrl}));}
+function loadLocalCache(){try{const r=localStorage.getItem(LOCAL_KEY);if(r){const p=JSON.parse(r);if(Array.isArray(p))state.ideas=p;}}catch(e){}}
+function saveLocalCache(){localStorage.setItem(LOCAL_KEY,JSON.stringify(state.ideas));}
+
+// ─── Apps Script API ────────────────────────────────────────────────
+async function apiRead(){
+  const res=await fetch(state.scriptUrl+'?action=read');
+  if(!res.ok)throw new Error('Read failed: '+res.status);
+  const data=await res.json();
+  if(data.error)throw new Error(data.error);
+  return data.ideas||[];
+}
+
+async function apiWrite(ideas){
+  const res=await fetch(state.scriptUrl+'?action=write',{
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({ideas:ideas}),
+  });
+  if(!res.ok)throw new Error('Write failed: '+res.status);
+  const data=await res.json();
+  if(data.error)throw new Error(data.error);
+  return data;
+}
+
+async function apiPing(){
+  const res=await fetch(state.scriptUrl+'?action=ping');
+  if(!res.ok)return false;
+  const data=await res.json();
+  return data.status==='ok';
+}
+
+// ─── Sync ───────────────────────────────────────────────────────────
+async function syncFromCloud(){
+  if(!state.configured)return;
+  state.syncStatus='syncing';render();
+  try{
+    state.ideas=await apiRead();
+    state.syncStatus='connected';state.lastSync=new Date();saveLocalCache();
+  }catch(e){console.error('Sync read error:',e);state.syncStatus='error';loadLocalCache();}
+  render();
+}
+
+async function syncToCloud(){
+  if(!state.configured){saveLocalCache();render();return;}
+  state.syncStatus='syncing';render();
+  try{
+    await apiWrite(state.ideas);
+    state.syncStatus='connected';state.lastSync=new Date();saveLocalCache();
+  }catch(e){console.error('Sync write error:',e);state.syncStatus='error';saveLocalCache();}
+  render();
+}
+
+let syncInterval=null;
+function startAutoSync(){if(syncInterval)clearInterval(syncInterval);syncInterval=setInterval(()=>{if(state.configured&&!state.modalOpen)syncFromCloud();},30000);}
+
+// ─── Render ─────────────────────────────────────────────────────────
+function render(){
+  const app=document.getElementById('app');
+  if(!state.configured){app.innerHTML=renderSetup();app.className='';}
+  else{app.innerHTML=renderSidebar()+'<div class="main">'+(state.modalOpen?renderModal():'')+renderPageContent()+'</div>';app.className='app';}
+  bindEvents();
+}
+
+// ─── Setup ──────────────────────────────────────────────────────────
+function renderSetup(){return`
+<div class="setup-screen">
+  <div class="logo-diamond" style="font-size:36px;margin-bottom:12px">\u25C8</div>
+  <div class="setup-title">Interactive Mirror Idea Matrix</div>
+  <div class="setup-subtitle">Cloud-synced creative idea management. Connect via Google Apps Script to sync across all your devices.</div>
+  <div class="setup-step">
+    <div class="setup-step-num">Step 1 \u2014 Open your Google Sheet</div>
+    <p>Open the Google Sheet you want to use (or create a new one). You do NOT need to add headers \u2014 the script handles that automatically.</p>
+  </div>
+  <div class="setup-step">
+    <div class="setup-step-num">Step 2 \u2014 Add the Apps Script</div>
+    <p>In your Google Sheet, click <strong>Extensions \u2192 Apps Script</strong></p>
+    <p>Delete any code in the editor, then paste the entire contents of the <strong>idea_matrix_apps_script.js</strong> file I gave you.</p>
+    <p>Click the <strong>floppy disk icon</strong> to save.</p>
+  </div>
+  <div class="setup-step">
+    <div class="setup-step-num">Step 3 \u2014 Deploy as Web App</div>
+    <p>In the Apps Script editor:</p>
+    <p>1. Click <strong>Deploy \u2192 New deployment</strong></p>
+    <p>2. Click the gear icon next to "Select type" and choose <strong>Web app</strong></p>
+    <p>3. Set "Execute as" to <strong>Me</strong></p>
+    <p>4. Set "Who has access" to <strong>Anyone</strong></p>
+    <p>5. Click <strong>Deploy</strong></p>
+    <p>6. Click <strong>Authorize access</strong> when prompted</p>
+    <p>7. If you see "Google hasn't verified this app", click <strong>Advanced \u2192 Go to (project name)</strong></p>
+    <p>8. Copy the <strong>Web app URL</strong> it gives you</p>
+  </div>
+  <div class="setup-step">
+    <div class="setup-step-num">Step 4 \u2014 Connect</div>
+    <div class="setup-input-group">
+      <label class="setup-label">Apps Script Web App URL</label>
+      <input class="setup-input" id="setup-url" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <button class="setup-btn" id="setup-connect">\u26A1 Connect &amp; Launch</button>
+    <div class="setup-error" id="setup-error"></div>
+  </div>
+  <button class="setup-skip" id="setup-skip">Skip setup \u2014 use offline mode (localStorage only)</button>
+</div>`;}
+
+// ─── Sidebar ────────────────────────────────────────────────────────
+function renderSidebar(){
+  const pages=[{id:'catalog',icon:'\u25A3',label:'Catalog'},{id:'dashboard',icon:'\u25C8',label:'Dashboard'},{id:'connections',icon:'\u2194',label:'Connections'}];
+  const syncText={connected:'Synced'+(state.lastSync?' '+state.lastSync.toLocaleTimeString():''),syncing:'Syncing...',error:'Sync error \u2014 using cache',offline:'Offline mode'}[state.syncStatus]||'';
+
+  let filtersHtml='';
+  if(state.page==='catalog'){
+    filtersHtml='<div class="nav-section"><div class="nav-label">Filters</div>'
+      +'<div class="filter-group"><div class="filter-label">Search</div><input class="filter-input" type="text" placeholder="Search ideas..." value="'+esc(state.filters.search)+'" data-action="filter-search"></div>'
+      +'<div class="filter-group"><div class="filter-label">Domain</div><select class="filter-select" data-action="filter-domain"><option value="all">All Domains</option>'+Object.entries(DOMAINS).map(([k,v])=>'<option value="'+k+'"'+(state.filters.domain===k?' selected':'')+'>'+v.icon+' '+v.label+'</option>').join('')+'</select></div>'
+      +'<div class="filter-group"><div class="filter-label">Stage</div><select class="filter-select" data-action="filter-stage"><option value="all">All Stages</option>'+Object.entries(STAGES).map(([k,v])=>'<option value="'+k+'"'+(state.filters.stage===k?' selected':'')+'>'+v.icon+' '+v.label+'</option>').join('')+'</select></div>'
+      +'<div class="filter-group"><div class="filter-label">Energy</div><select class="filter-select" data-action="filter-priority"><option value="all">All Levels</option>'+Object.entries(PRIORITIES).map(([k,v])=>'<option value="'+k+'"'+(state.filters.priority===k?' selected':'')+'>'+v.label+'</option>').join('')+'</select></div></div>';
+  }
+
+  return'<div class="sidebar"><div class="logo"><span class="logo-diamond">\u25C8</span> Idea Matrix</div><div class="logo-sub">Interactive Mirror</div>'
+    +'<div class="idea-count">'+state.ideas.length+' idea'+(state.ideas.length!==1?'s':'')+' captured</div>'
+    +'<div class="sync-status"><span class="sync-dot '+state.syncStatus+'"></span> '+syncText+'</div>'
+    +'<button class="capture-btn" data-action="open-capture">\u26A1 Quick Capture</button>'
+    +'<div class="nav-section"><div class="nav-label">Navigate</div>'+pages.map(p=>'<button class="nav-btn'+(state.page===p.id?' active':'')+'" data-action="nav" data-page="'+p.id+'"><span class="nav-icon">'+p.icon+'</span> '+p.label+'</button>').join('')+'</div>'
+    +filtersHtml
+    +'<div class="sidebar-footer"><button class="sidebar-footer-btn" data-action="sync-now">\u21BB Sync Now</button><button class="sidebar-footer-btn" data-action="export-json">\u2913 Export JSON</button><button class="sidebar-footer-btn" data-action="import-json">\u2912 Import JSON</button><button class="sidebar-footer-btn" data-action="reset-config">\u2699 Settings</button></div></div>';
+}
+
+// ─── Pages ──────────────────────────────────────────────────────────
+function renderPageContent(){switch(state.page){case'dashboard':return renderDashboard();case'connections':return renderConnections();default:return renderCatalog();}}
+
+function renderCatalog(){
+  let ideas=[...state.ideas];const f=state.filters;
+  if(f.search){const q=f.search.toLowerCase();ideas=ideas.filter(i=>i.title.toLowerCase().includes(q)||(i.notes||'').toLowerCase().includes(q)||(i.tags||[]).some(t=>t.includes(q)));}
+  if(f.domain!=='all')ideas=ideas.filter(i=>i.domain===f.domain);
+  if(f.stage!=='all')ideas=ideas.filter(i=>i.stage===f.stage);
+  if(f.priority!=='all')ideas=ideas.filter(i=>i.priority===f.priority);
+  ideas.sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+  let cards=ideas.map((idea,idx)=>renderCard(idea,idx)).join('');
+  if(!ideas.length)cards='<div class="empty-state"><p>No ideas match your filters.</p><button class="capture-btn" data-action="open-capture" style="display:inline-flex;width:auto;padding:10px 24px">\u26A1 Capture one now</button></div>';
+  return'<div class="page-header"><div class="page-title">Catalog</div><div class="page-subtitle">Showing '+ideas.length+' of '+state.ideas.length+' ideas</div></div>'+cards;
+}
+
+function renderCard(idea,idx){
+  const d=DOMAINS[idea.domain]||{},s=STAGES[idea.stage]||{},p=PRIORITIES[idea.priority]||{};
+  const expanded=state.expandedId===idea.id;
+  const tags=idea.tags||[],linked=(idea.linkedIds||[]).map(lid=>getIdea(lid)).filter(Boolean);
+  let expandedHtml='';
+  if(expanded){
+    const si=STAGE_KEYS.indexOf(idea.stage),canAdv=si>=0&&si<STAGE_KEYS.length-1;
+    const ns=canAdv?STAGES[STAGE_KEYS[si+1]]:null;
+    expandedHtml='<div class="card-expanded">'+(idea.notes?'<div class="card-notes">'+esc(idea.notes)+'</div>':'')
+      +(linked.length?'<div class="linked-section"><span class="linked-label">Linked:</span>'+linked.map(l=>{const ld=DOMAINS[l.domain]||{};return'<span class="linked-chip"><span style="color:'+ld.color+'">'+ld.icon+'</span> '+esc(l.title.length>35?l.title.slice(0,35)+'\u2026':l.title)+'</span>';}).join('')+'</div>':'')
+      +'<div class="card-actions"><button class="action-btn" data-action="edit" data-id="'+idea.id+'">Edit</button>'+(canAdv?'<button class="action-btn advance" data-action="advance" data-id="'+idea.id+'">\u2192 '+ns.label+'</button>':'')+'<button class="action-btn danger" data-action="delete" data-id="'+idea.id+'">Delete</button></div></div>';
+  }
+  const notesP=(!expanded&&idea.notes)?'<div class="card-notes">'+esc(idea.notes.length>120?idea.notes.slice(0,120)+'\u2026':idea.notes)+'</div>':'';
+  return'<div class="idea-card'+(expanded?' expanded':'')+'" data-action="toggle-expand" data-id="'+idea.id+'" style="border-left-color:'+d.color+';animation-delay:'+idx*0.04+'s">'
+    +'<div class="card-top"><span class="domain-badge '+d.cls+'">'+d.icon+' '+d.label+'</span><span class="priority-indicator" style="background:'+p.color+'" title="'+p.label+'"></span></div>'
+    +'<div class="card-title">'+esc(idea.title)+'</div>'+notesP
+    +(tags.length?'<div class="card-tags">'+tags.map(t=>'<span class="tag-chip">#'+esc(t)+'</span>').join('')+'</div>':'')
+    +'<div class="card-meta"><span class="stage">'+s.icon+' '+s.label+'</span>'+(linked.length?'<span class="links">\uD83D\uDD17 '+linked.length+'</span>':'')+'<span class="date">'+(idea.created||'')+'</span></div>'+expandedHtml+'</div>';
+}
+
+function renderDashboard(){
+  const ideas=state.ideas,total=ideas.length,high=ideas.filter(i=>i.priority==='high').length,linked=ideas.filter(i=>(i.linkedIds||[]).length>0).length,complete=ideas.filter(i=>i.stage==='complete').length;
+  let domainBars=Object.entries(DOMAINS).map(([k,v])=>{const c=ideas.filter(i=>i.domain===k).length,pct=total?(c/total*100):0;return'<div class="bar-row"><span class="bar-label">'+v.icon+' '+v.label+'</span><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+v.color+'"></div></div><span class="bar-count">'+c+'</span></div>';}).join('');
+  let stageBars=Object.entries(STAGES).map(([k,v])=>{const c=ideas.filter(i=>i.stage===k).length,pct=total?(c/total*100):0;return'<div class="bar-row"><span class="bar-label">'+v.icon+' '+v.label+'</span><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--accent-gold)"></div></div><span class="bar-count">'+c+'</span></div>';}).join('');
+  const highIdeas=ideas.filter(i=>i.priority==='high').slice(0,8);
+  let highList=highIdeas.length?highIdeas.map(i=>{const d=DOMAINS[i.domain]||{};return'<div class="cluster-idea"><span style="color:'+d.color+';min-width:18px">'+d.icon+'</span> <strong>'+esc(i.title)+'</strong> <span class="cluster-links" style="margin-left:auto">'+i.created+'</span></div>';}).join(''):'<div style="color:var(--text-muted);font-size:13px">No high energy ideas yet.</div>';
+  const tagMap={};ideas.forEach(i=>(i.tags||[]).forEach(t=>{tagMap[t]=(tagMap[t]||0)+1;}));
+  const sortedTags=Object.entries(tagMap).sort((a,b)=>b[1]-a[1]);
+  const tagCloud=sortedTags.length?sortedTags.map(([t,c])=>'<span class="tag-chip">#'+esc(t)+' ('+c+')</span>').join(' '):'<span style="color:var(--text-muted);font-size:12px">No tags yet.</span>';
+  return'<div class="page-header"><div class="page-title">Dashboard</div><div class="page-subtitle">Overview of your creative universe</div></div><div class="stats-grid"><div class="stat-card"><div class="stat-number" style="color:var(--accent-gold)">'+total+'</div><div class="stat-label">Total Ideas</div></div><div class="stat-card"><div class="stat-number" style="color:var(--accent-red)">'+high+'</div><div class="stat-label">High Energy</div></div><div class="stat-card"><div class="stat-number" style="color:var(--accent-teal)">'+linked+'</div><div class="stat-label">Cross-Linked</div></div><div class="stat-card"><div class="stat-number" style="color:var(--accent-blue)">'+complete+'</div><div class="stat-label">Complete</div></div></div><div class="breakdown-grid"><div class="breakdown-card"><div class="breakdown-title">By Domain</div>'+domainBars+'</div><div class="breakdown-card"><div class="breakdown-title">By Stage</div>'+stageBars+'</div></div><div class="breakdown-card" style="margin-bottom:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px"><div class="breakdown-title">\uD83D\uDD25 High Energy Ideas</div>'+highList+'</div><div class="breakdown-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px"><div class="breakdown-title">\uD83C\uDFF7\uFE0F Tag Cloud</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+tagCloud+'</div></div>';
+}
+
+function renderConnections(){
+  const ideas=state.ideas,visited=new Set(),clusters=[];
+  ideas.forEach(idea=>{if(visited.has(idea.id))return;const cluster=[],queue=[idea.id];while(queue.length){const cid=queue.shift();if(visited.has(cid))continue;visited.add(cid);const c=getIdea(cid);if(c){cluster.push(c);(c.linkedIds||[]).forEach(lid=>{if(!visited.has(lid))queue.push(lid);});}}if(cluster.length>1)clusters.push(cluster);});
+  let html='';
+  if(clusters.length){
+    html=clusters.map((cluster,idx)=>{const domains=[...new Set(cluster.map(i=>i.domain))];const icons=domains.map(d=>(DOMAINS[d]||{}).icon||'').join(' ');const items=cluster.map(idea=>{const d=DOMAINS[idea.domain]||{};const links=(idea.linkedIds||[]).map(lid=>{const l=getIdea(lid);if(!l)return'';const ld=DOMAINS[l.domain]||{};return ld.icon+' '+esc(l.title.length>35?l.title.slice(0,35)+'\u2026':l.title);}).filter(Boolean);return'<div class="cluster-idea"><span style="color:'+d.color+';min-width:18px">'+d.icon+'</span> <strong>'+esc(idea.title)+'</strong>'+(links.length?' <span class="cluster-links">\u2192 '+links.join(', ')+'</span>':'')+'</div>';}).join('');return'<div class="cluster-block"><div class="cluster-title">Cluster '+(idx+1)+' \u2014 '+icons+' ('+cluster.length+' ideas, '+domains.length+' domains)</div>'+items+'</div>';}).join('');
+    let cd=0,tl=0;ideas.forEach(i=>{(i.linkedIds||[]).forEach(lid=>{tl++;const l=getIdea(lid);if(l&&l.domain!==i.domain)cd++;});});
+    html+='<div style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);margin-top:12px"><strong>'+tl+'</strong> total links \u00B7 <strong>'+cd+'</strong> cross-domain \u00B7 <strong>'+clusters.length+'</strong> clusters</div>';
+  }else{html='<div class="empty-state"><p>No linked clusters yet. Link ideas during capture to see connections emerge.</p></div>';}
+  const unlinked=ideas.filter(i=>(i.linkedIds||[]).length===0);
+  if(unlinked.length)html+='<div class="breakdown-card" style="margin-top:20px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px"><div class="breakdown-title">\uD83D\uDCA1 '+unlinked.length+' Unlinked Ideas</div>'+unlinked.map(i=>{const d=DOMAINS[i.domain]||{};return'<div class="cluster-idea"><span style="color:'+d.color+';min-width:18px">'+d.icon+'</span> '+esc(i.title)+'</div>';}).join('')+'</div>';
+  return'<div class="page-header"><div class="page-title">Connections</div><div class="page-subtitle">How your ideas link across domains</div></div>'+html;
+}
+
+// ─── Modal ──────────────────────────────────────────────────────────
+function renderModal(){
+  const editing=state.editingId?getIdea(state.editingId):null;
+  const title=editing?editing.title:'',notes=editing?(editing.notes||''):'',tags=editing?(editing.tags||[]).join(', '):'';
+  const ms=modalState;
+  const domainChips=Object.entries(DOMAINS).map(([k,v])=>{const sel=ms.domain===k;return'<button class="chip-btn'+(sel?' selected':'')+'" style="'+(sel?'background:'+v.color+';border-color:'+v.color:'')+'" data-action="modal-domain" data-val="'+k+'">'+v.icon+' '+v.label+'</button>';}).join('');
+  const stageChips=Object.entries(STAGES).map(([k,v])=>{const sel=ms.stage===k;return'<button class="chip-btn'+(sel?' selected':'')+'" style="'+(sel?'background:var(--bg-elevated);border-color:var(--text-muted);color:var(--text-primary)':'')+'" data-action="modal-stage" data-val="'+k+'">'+v.icon+' '+v.label+'</button>';}).join('');
+  const prioChips=Object.entries(PRIORITIES).map(([k,v])=>{const sel=ms.priority===k;return'<button class="chip-btn'+(sel?' selected':'')+'" style="'+(sel?'background:'+v.color+';border-color:'+v.color:'')+'" data-action="modal-priority" data-val="'+k+'">'+v.label+'</button>';}).join('');
+  const others=state.ideas.filter(i=>!editing||i.id!==editing.id);
+  const linkItems=others.slice(0,15).map(i=>{const d=DOMAINS[i.domain]||{};const sel=ms.linkedIds.includes(i.id);return'<button class="link-item'+(sel?' selected':'')+'" data-action="modal-link" data-id="'+i.id+'"><span style="color:'+d.color+'">'+d.icon+'</span> '+esc(i.title.length>40?i.title.slice(0,40)+'\u2026':i.title)+(sel?'<span class="link-badge">linked</span>':'')+'</button>';}).join('');
+  return'<div class="modal-overlay" data-action="close-modal"><div class="modal" onclick="event.stopPropagation()"><div class="modal-header"><div class="modal-title">'+(editing?'Edit Idea':'\u26A1 Quick Capture')+'</div><button class="modal-close" data-action="close-modal">\u2715</button></div>'
+    +'<div class="form-group"><input class="form-input title-input" id="modal-title" placeholder="What\'s the idea?" value="'+esc(title)+'"></div>'
+    +'<div class="form-group"><div class="form-label">Domain</div><div class="chip-row">'+domainChips+'</div></div>'
+    +'<div class="form-group"><div class="form-label">Stage</div><div class="chip-row">'+stageChips+'</div></div>'
+    +'<div class="form-group"><div class="form-label">Energy Level</div><div class="chip-row">'+prioChips+'</div></div>'
+    +'<div class="form-group"><div class="form-label">Notes</div><textarea class="form-textarea" id="modal-notes" placeholder="Context, connections, initial thoughts...">'+esc(notes)+'</textarea></div>'
+    +'<div class="form-group"><div class="form-label">Tags (comma-separated)</div><input class="form-input" id="modal-tags" placeholder="e.g., options, earnings, TSLA" value="'+esc(tags)+'"></div>'
+    +(others.length?'<div class="form-group"><div class="form-label">Link to existing ideas</div><div class="link-list">'+linkItems+'</div></div>':'')
+    +'<button class="submit-btn" data-action="submit-modal">'+(editing?'Save Changes':'Capture Idea')+'</button></div></div>';
+}
+
+function openModal(editId){
+  if(editId){const idea=getIdea(editId);if(idea){modalState={domain:idea.domain,stage:idea.stage,priority:idea.priority,linkedIds:[...(idea.linkedIds||[])]};state.editingId=editId;}}
+  else{modalState={domain:'music',stage:'spark',priority:'medium',linkedIds:[]};state.editingId=null;}
+  state.modalOpen=true;render();setTimeout(()=>{const el=document.getElementById('modal-title');if(el)el.focus();},100);
+}
+function closeModal(){state.modalOpen=false;state.editingId=null;render();}
+
+function submitModal(){
+  const title=(document.getElementById('modal-title')?.value||'').trim();if(!title)return;
+  const notes=(document.getElementById('modal-notes')?.value||'').trim();
+  const tagsRaw=document.getElementById('modal-tags')?.value||'';
+  const tags=tagsRaw.split(',').map(t=>t.trim().toLowerCase().replace(/^#/,'')).filter(Boolean);
+  const t=today();
+  if(state.editingId){state.ideas=state.ideas.map(i=>i.id===state.editingId?{...i,title,notes,tags,domain:modalState.domain,stage:modalState.stage,priority:modalState.priority,linkedIds:modalState.linkedIds,updated:t}:i);}
+  else{state.ideas.unshift({id:nextId(),title,notes,tags,domain:modalState.domain,stage:modalState.stage,priority:modalState.priority,linkedIds:modalState.linkedIds,created:t,updated:t});}
+  state.modalOpen=false;state.editingId=null;syncToCloud();
+}
+
+// ─── Events ─────────────────────────────────────────────────────────
+function bindEvents(){
+  const connectBtn=document.getElementById('setup-connect');
+  if(connectBtn){connectBtn.addEventListener('click',async()=>{
+    const url=(document.getElementById('setup-url')?.value||'').trim();
+    const errEl=document.getElementById('setup-error');
+    if(!url||!url.startsWith('https://script.google.com')){if(errEl){errEl.textContent='Please paste a valid Apps Script URL (starts with https://script.google.com)';errEl.style.display='block';}return;}
+    state.scriptUrl=url;connectBtn.textContent='Connecting...';connectBtn.disabled=true;
+    try{const ok=await apiPing();
+      if(ok){state.configured=true;saveConfig();await syncFromCloud();startAutoSync();render();}
+      else{if(errEl){errEl.textContent='Could not connect. Make sure you deployed as a Web App with "Anyone" access.';errEl.style.display='block';}connectBtn.textContent='\u26A1 Connect & Launch';connectBtn.disabled=false;}
+    }catch(e){if(errEl){errEl.textContent='Connection error: '+e.message+'. Check your URL and deployment settings.';errEl.style.display='block';}connectBtn.textContent='\u26A1 Connect & Launch';connectBtn.disabled=false;}
+  });}
+  const skipBtn=document.getElementById('setup-skip');
+  if(skipBtn){skipBtn.addEventListener('click',()=>{state.configured=true;state.syncStatus='offline';loadLocalCache();render();});}
+
+  document.querySelectorAll('[data-action]').forEach(el=>{
+    const action=el.dataset.action;
+    if(action==='nav')el.addEventListener('click',e=>{e.stopPropagation();state.page=el.dataset.page;state.expandedId=null;render();});
+    else if(action==='open-capture')el.addEventListener('click',e=>{e.stopPropagation();openModal(null);});
+    else if(action==='close-modal')el.addEventListener('click',()=>closeModal());
+    else if(action==='submit-modal')el.addEventListener('click',()=>submitModal());
+    else if(action==='toggle-expand')el.addEventListener('click',e=>{if(e.target.closest('[data-action="edit"]')||e.target.closest('[data-action="delete"]')||e.target.closest('[data-action="advance"]'))return;const id=parseInt(el.dataset.id);state.expandedId=state.expandedId===id?null:id;render();});
+    else if(action==='edit')el.addEventListener('click',e=>{e.stopPropagation();openModal(parseInt(el.dataset.id));});
+    else if(action==='delete')el.addEventListener('click',e=>{e.stopPropagation();const id=parseInt(el.dataset.id);state.ideas=state.ideas.filter(i=>i.id!==id).map(i=>({...i,linkedIds:(i.linkedIds||[]).filter(lid=>lid!==id)}));state.expandedId=null;syncToCloud();});
+    else if(action==='advance')el.addEventListener('click',e=>{e.stopPropagation();const id=parseInt(el.dataset.id);const idea=getIdea(id);if(idea){const idx=STAGE_KEYS.indexOf(idea.stage);if(idx>=0&&idx<STAGE_KEYS.length-1){idea.stage=STAGE_KEYS[idx+1];idea.updated=today();syncToCloud();}}});
+    else if(action==='modal-domain')el.addEventListener('click',e=>{e.stopPropagation();modalState.domain=el.dataset.val;render();});
+    else if(action==='modal-stage')el.addEventListener('click',e=>{e.stopPropagation();modalState.stage=el.dataset.val;render();});
+    else if(action==='modal-priority')el.addEventListener('click',e=>{e.stopPropagation();modalState.priority=el.dataset.val;render();});
+    else if(action==='modal-link')el.addEventListener('click',e=>{e.stopPropagation();const id=parseInt(el.dataset.id);if(modalState.linkedIds.includes(id))modalState.linkedIds=modalState.linkedIds.filter(lid=>lid!==id);else modalState.linkedIds.push(id);render();});
+    else if(action==='filter-search')el.addEventListener('input',e=>{state.filters.search=e.target.value;render();setTimeout(()=>{const s=document.querySelector('[data-action="filter-search"]');if(s){s.focus();s.selectionStart=s.selectionEnd=s.value.length;}},10);});
+    else if(action==='filter-domain')el.addEventListener('change',e=>{state.filters.domain=e.target.value;render();});
+    else if(action==='filter-stage')el.addEventListener('change',e=>{state.filters.stage=e.target.value;render();});
+    else if(action==='filter-priority')el.addEventListener('change',e=>{state.filters.priority=e.target.value;render();});
+    else if(action==='sync-now')el.addEventListener('click',()=>syncFromCloud());
+    else if(action==='export-json')el.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.ideas,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='idea_matrix_export_'+today()+'.json';a.click();URL.revokeObjectURL(url);});
+    else if(action==='import-json')el.addEventListener('click',()=>{const input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const parsed=JSON.parse(ev.target.result);if(Array.isArray(parsed)){state.ideas=parsed;syncToCloud();}}catch(err){alert('Invalid JSON file.');}};reader.readAsText(file);};input.click();});
+    else if(action==='reset-config')el.addEventListener('click',()=>{if(confirm('Reset cloud connection? Your data is safe in Google Sheets.')){localStorage.removeItem(CONFIG_KEY);state.configured=false;state.scriptUrl='';render();}});
+  });
+  const titleInput=document.getElementById('modal-title');
+  if(titleInput)titleInput.addEventListener('keydown',e=>{if(e.key==='Enter')submitModal();});
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.modalOpen)closeModal();if(e.key==='n'&&!state.modalOpen&&!e.ctrlKey&&!e.metaKey&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){e.preventDefault();openModal(null);}});
+
+// Init
+loadConfig();loadLocalCache();render();
+if(state.configured){syncFromCloud();startAutoSync();}
+</script>
+</body>
+</html>
